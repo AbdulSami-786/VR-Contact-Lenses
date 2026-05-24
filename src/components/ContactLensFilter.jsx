@@ -3112,9 +3112,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 720;
-
 const FACE_MESH_SCRIPT = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
 const FACE_MESH_ASSET_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh";
 
@@ -3233,6 +3230,8 @@ export default function TryOn() {
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [captured,       setCaptured]       = useState(false);
   const [ripple,         setRipple]         = useState(false);
+  // FIX 1: dynamic canvas size instead of hardcoded 1280x720
+  const [canvasSize,     setCanvasSize]     = useState({ w: 1280, h: 720 });
 
   const selectedLens = useMemo(
     () => LENS_OPTIONS.find(l => l.id === selectedLensId) || LENS_OPTIONS[0],
@@ -3264,7 +3263,6 @@ export default function TryOn() {
     setSelectedLensId(LENS_OPTIONS[next].id);
   }, [selectedIdx]);
 
-  // Touch swipe to change lens
   const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const handleTouchEnd = (e) => {
     if (touchStartX.current === null) return;
@@ -3278,12 +3276,22 @@ export default function TryOn() {
     async function setup() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: CANVAS_WIDTH }, height: { ideal: CANVAS_HEIGHT }, facingMode: "user" },
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
           audio: false,
         });
         if (!mounted) return;
         streamRef.current = stream;
-        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+
+          // FIX 2: read actual track resolution and update canvas size
+          const track = stream.getVideoTracks()[0];
+          if (track) {
+            const { width, height } = track.getSettings();
+            if (width && height) setCanvasSize({ w: width, h: height });
+          }
+        }
         setCameraReady(true);
       } catch { setCameraError("Camera access denied. Allow camera and reload."); }
 
@@ -3317,33 +3325,57 @@ export default function TryOn() {
     async function render(time) {
       if (!running) return;
       const videoReady = video.readyState >= 2;
+
+      // FIX 3: use canvas.width / canvas.height everywhere instead of constants
+      const cw = canvas.width;
+      const ch = canvas.height;
+
       ctx.save();
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.clearRect(0, 0, cw, ch);
+
       if (videoReady) {
-        ctx.translate(CANVAS_WIDTH, 0); ctx.scale(-1, 1);
+        // Mirror flip
+        ctx.translate(cw, 0);
+        ctx.scale(-1, 1);
+
+        // FIX 4: object-fit cover math — no more stretching
         ctx.filter = `brightness(${settings.brightness}%) contrast(${settings.contrast}%) saturate(${settings.saturation}%)`;
-        ctx.drawImage(video, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        ctx.filter = "none"; ctx.restore();
+        const vw = video.videoWidth  || cw;
+        const vh = video.videoHeight || ch;
+        const scale = Math.max(cw / vw, ch / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        const dx = (cw - dw) / 2;
+        const dy = (ch - dh) / 2;
+        ctx.drawImage(video, dx, dy, dw, dh);
+
+        ctx.filter = "none";
+        ctx.restore();
+
         if (faceMeshRef.current && modelReady && time - lastSendRef.current > 45) {
           lastSendRef.current = time;
           try { await faceMeshRef.current.send({ image: video }); } catch {}
         }
+
         const landmarks = latestLandmarksRef.current;
         if (landmarks) {
+          // FIX 5: use cw/ch for landmark coordinate mapping
           const ml = landmarks.map(p => ({ ...p, x: 1 - p.x }));
-          drawLens(ctx, getIrisData(ml, LEFT_IRIS,  CANVAS_WIDTH, CANVAS_HEIGHT), selectedLens, settings, "left");
-          drawLens(ctx, getIrisData(ml, RIGHT_IRIS, CANVAS_WIDTH, CANVAS_HEIGHT), selectedLens, settings, "right");
+          drawLens(ctx, getIrisData(ml, LEFT_IRIS,  cw, ch), selectedLens, settings, "left");
+          drawLens(ctx, getIrisData(ml, RIGHT_IRIS, cw, ch), selectedLens, settings, "right");
         }
       } else {
         ctx.restore();
-        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, cw, ch);
       }
       frameRef.current = requestAnimationFrame(render);
     }
 
     frameRef.current = requestAnimationFrame(render);
     return () => { running = false; if (frameRef.current) cancelAnimationFrame(frameRef.current); };
-  }, [modelReady, selectedLens, settings]);
+  // FIX 6: canvasSize in deps so render loop restarts when resolution is known
+  }, [modelReady, selectedLens, settings, canvasSize]);
 
   const isLive = cameraReady && modelReady;
 
@@ -3357,10 +3389,11 @@ export default function TryOn() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {/* FIX 7: canvas dimensions driven by canvasSize state */}
         <canvas
           ref={canvasRef}
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
+          width={canvasSize.w}
+          height={canvasSize.h}
           className="al-canvas"
         />
 
@@ -3550,9 +3583,12 @@ export default function TryOn() {
           user-select: none;
         }
 
+        /* FIX: object-fit cover so canvas fills screen without distortion */
         .al-canvas {
           position: absolute;
-          inset: 0;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
           width: 100%;
           height: 100%;
           object-fit: cover;
