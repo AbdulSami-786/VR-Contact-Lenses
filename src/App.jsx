@@ -1,11 +1,11 @@
 import React from 'react';
 import './App.css';
-import ContactLensFilter from './components/ContactLensFilter';
+import TryOn from './components/ContactLensFilter';
 
 function App() {
   return (
     <div className="App">
-      <ContactLensFilter />
+      <TryOn  />
     </div>
   );
 }
