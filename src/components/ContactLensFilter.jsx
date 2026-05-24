@@ -2513,6 +2513,7 @@ function drawLens(ctx, iris, lens, settings, side = "left") {
   ctx.restore();
 }
 
+// DEFAULT VALUES: Brightness 145%, Contrast 50%, Saturation 100%, blend mode soft-light
 const DEFAULT_SETTINGS = {
   autoFit: 0,
   size: 0.29,
@@ -2533,10 +2534,10 @@ const DEFAULT_SETTINGS = {
   patternInner: 0.28,
   patternOuter: 0.88,
   pupilCutoutOpacity: 0.95,
-  brightness: 143,
-  contrast: 76,
+  brightness: 145,
+  contrast: 50,
   saturation: 100,
-  blendMode: "multiply",
+  blendMode: "soft-light",
 };
 
 export default function TryOn() {
@@ -2656,9 +2657,8 @@ export default function TryOn() {
       <video ref={videoRef} muted playsInline autoPlay className="ls-hidden-video" />
 
       <main className="ls-shell">
-        {/* ── CAMERA PANEL ── */}
+        {/* ── CAMERA PANEL - takes 65% height on mobile ── */}
         <section className="ls-preview">
-          {/* Canvas wrapper maintains 16:9 — fixes stretch */}
           <div className="ls-canvas-wrap">
             <canvas
               ref={canvasRef}
@@ -2668,30 +2668,38 @@ export default function TryOn() {
             />
           </div>
 
+          {/* Top bar - Snapchat style */}
           <div className="ls-topbar">
             <div>
-              <div className="ls-brand">Lens Studio</div>
-              <div className="ls-subbrand">Custom contact lens try-on</div>
+              <div className="ls-brand">👁️ AURALENS</div>
+              <div className="ls-subbrand">virtual try-on</div>
             </div>
             <div className="ls-status">
               <span className="ls-dot" style={{ background: cameraReady && modelReady ? "#36d67a" : "#f4b942" }} />
-              {cameraReady && modelReady ? "Live tracking" : "Loading"}
+              {cameraReady && modelReady ? "LIVE" : "STARTING"}
             </div>
           </div>
 
+          {/* Bottom lens carousel - Instagram/Snapchat style */}
           <div className="ls-mobile-lensbar">
             {LENS_OPTIONS.map((lens) => (
               <button
                 key={lens.id}
                 type="button"
                 onClick={() => setSelectedLensId(lens.id)}
-                className="ls-mobile-lens-btn"
-                style={{ borderColor: selectedLensId === lens.id ? "#ffffff" : "rgba(255,255,255,.22)" }}
+                className={`ls-mobile-lens-btn ${selectedLensId === lens.id ? "active-lens" : ""}`}
+                style={{ borderColor: selectedLensId === lens.id ? "#ffffff" : "rgba(255,255,255,.3)" }}
               >
                 <span className="ls-color-dot" style={{ background: lens.color }} />
+                <span className="ls-lens-label">{lens.name.split(" ")[0]}</span>
               </button>
             ))}
           </div>
+
+          {/* Capture button overlay - center bottom like Instagram */}
+          <button className="ls-capture-btn" onClick={capturePhoto}>
+            <div className="capture-inner" />
+          </button>
 
           {(!cameraReady || !modelReady || cameraError) && (
             <div className="ls-overlay">
@@ -2704,65 +2712,48 @@ export default function TryOn() {
           )}
         </section>
 
-        {/* ── CONTROL PANEL ── */}
+        {/* ── CONTROL PANEL - scrollable bottom sheet ── */}
         <aside className="ls-sidebar">
-          <div>
-            <p className="ls-eyebrow">CUSTOM FIT</p>
-            <h1 className="ls-title">Adjust lens for every eye</h1>
-            <p className="ls-description">
-              The right fit depends on iris size, camera distance, eye shape, and face angle.
-            </p>
+          <div className="ls-sidebar-header">
+            <p className="ls-eyebrow">✨ CUSTOMIZE</p>
+            <h1 className="ls-title">Adjust your lens</h1>
           </div>
 
+          {/* Selected lens pill */}
           <div className="ls-selected-card">
-            <div className="ls-selected-swatch" style={{ background: selectedLens.color }} />
+            <div className="ls-selected-swatch" style={{ background: selectedLens.color, boxShadow: `0 0 12px ${selectedLens.color}` }} />
             <div>
               <h2 className="ls-selected-name">{selectedLens.name}</h2>
               <p className="ls-selected-price">{selectedLens.price}</p>
             </div>
           </div>
 
-          <div className="ls-grid">
-            {LENS_OPTIONS.map((lens) => (
+          {/* Quick lens row */}
+          <div className="ls-quick-row">
+            {LENS_OPTIONS.slice(0, 4).map((lens) => (
               <button
                 key={lens.id}
-                type="button"
                 onClick={() => setSelectedLensId(lens.id)}
-                className="ls-lens-card"
-                style={{
-                  borderColor: selectedLensId === lens.id ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.12)",
-                  background:  selectedLensId === lens.id ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.055)",
-                }}
+                className={`ls-quick-lens ${selectedLensId === lens.id ? "active" : ""}`}
               >
-                <span className="ls-lens-swatch" style={{ background: lens.color }} />
-                <strong className="ls-lens-name">{lens.name}</strong>
-                <span className="ls-lens-price">{lens.price}</span>
+                <span style={{ background: lens.color }} />
               </button>
             ))}
           </div>
 
           <div className="ls-controls">
-            <SectionTitle title="Lens Appearance" />
+            <div className="ls-section-header">
+              <span>🎨 IMAGE FILTERS</span>
+              <button onClick={resetSettings} className="ls-reset-mini">reset</button>
+            </div>
 
-            <Slider label="Lens opacity"         value={settings.opacity}           min="0.05" max="1"    step="0.01" display={`${Math.round(settings.opacity * 100)}%`}           onChange={(v) => updateSetting("opacity", v)} />
-            <Slider label="Pupil opening"         value={settings.pupil}             min="0.1"  max="0.65" step="0.01" display={`${Math.round(settings.pupil * 100)}%`}             onChange={(v) => updateSetting("pupil", v)} />
-            <Slider label="Pupil cutout strength" value={settings.pupilCutoutOpacity} min="0.25" max="1"    step="0.01" display={`${Math.round(settings.pupilCutoutOpacity * 100)}%`} onChange={(v) => updateSetting("pupilCutoutOpacity", v)} />
-            <Slider label="Outer ring thickness"  value={settings.ringThickness}     min="0"    max="0.28" step="0.01" display={`${Math.round(settings.ringThickness * 100)}%`}     onChange={(v) => updateSetting("ringThickness", v)} />
-            <Slider label="Outer ring opacity"    value={settings.ringOpacity}       min="0"    max="1"    step="0.01" display={`${Math.round(settings.ringOpacity * 100)}%`}       onChange={(v) => updateSetting("ringOpacity", v)} />
-            <Slider label="Pattern opacity"       value={settings.patternOpacity}    min="0"    max="1"    step="0.01" display={`${Math.round(settings.patternOpacity * 100)}%`}    onChange={(v) => updateSetting("patternOpacity", v)} />
-            <Slider label="Pattern lines"         value={settings.patternLines}      min="0"    max="64"   step="1"    display={`${settings.patternLines}`}                          onChange={(v) => updateSetting("patternLines", v)} />
-            <Slider label="Pattern inner radius"  value={settings.patternInner}      min="0.05" max="0.65" step="0.01" display={`${Math.round(settings.patternInner * 100)}%`}      onChange={(v) => updateSetting("patternInner", v)} />
-            <Slider label="Pattern outer radius"  value={settings.patternOuter}      min="0.4"  max="1"    step="0.01" display={`${Math.round(settings.patternOuter * 100)}%`}      onChange={(v) => updateSetting("patternOuter", v)} />
+            <Slider label="☀️ Brightness" value={settings.brightness} min="50" max="170" step="1" display={`${settings.brightness}%`} onChange={(v) => updateSetting("brightness", v)} />
+            <Slider label="🎚️ Contrast"   value={settings.contrast}   min="50" max="180" step="1" display={`${settings.contrast}%`}   onChange={(v) => updateSetting("contrast", v)} />
+            <Slider label="🌈 Saturation" value={settings.saturation} min="40" max="200" step="1" display={`${settings.saturation}%`} onChange={(v) => updateSetting("saturation", v)} />
 
-            <SectionTitle title="Camera Image" />
-
-            <Slider label="Brightness" value={settings.brightness} min="50"  max="170" step="1" display={`${settings.brightness}%`} onChange={(v) => updateSetting("brightness", v)} />
-            <Slider label="Contrast"   value={settings.contrast}   min="50"  max="180" step="1" display={`${settings.contrast}%`}   onChange={(v) => updateSetting("contrast", v)} />
-            <Slider label="Saturation" value={settings.saturation} min="40"  max="200" step="1" display={`${settings.saturation}%`} onChange={(v) => updateSetting("saturation", v)} />
-
-            <label className="ls-select-wrap">
+            <div className="ls-select-wrap">
               <div className="ls-slider-top">
-                <span>Blend mode</span>
+                <span>🎭 Blend Mode</span>
                 <strong>{settings.blendMode}</strong>
               </div>
               <select
@@ -2770,130 +2761,119 @@ export default function TryOn() {
                 onChange={(e) => updateSetting("blendMode", e.target.value)}
                 className="ls-select"
               >
+                <option value="soft-light">soft-light (default)</option>
                 <option value="multiply">multiply</option>
-                <option value="source-over">normal</option>
                 <option value="overlay">overlay</option>
-                <option value="soft-light">soft-light</option>
                 <option value="color">color</option>
+                <option value="source-over">normal</option>
               </select>
-            </label>
-          </div>
+            </div>
 
-          <div className="ls-actions">
-            <button type="button" onClick={resetSettings} className="ls-btn-secondary">Reset</button>
-            <button type="button" onClick={capturePhoto}  className="ls-btn-primary">Capture</button>
+            <details className="ls-details">
+              <summary>🔧 lens fine-tuning</summary>
+              <div className="ls-details-content">
+                <Slider label="Lens opacity" value={settings.opacity} min="0.05" max="1" step="0.01" display={`${Math.round(settings.opacity * 100)}%`} onChange={(v) => updateSetting("opacity", v)} />
+                <Slider label="Pupil size" value={settings.pupil} min="0.1" max="0.65" step="0.01" display={`${Math.round(settings.pupil * 100)}%`} onChange={(v) => updateSetting("pupil", v)} />
+                <Slider label="Ring thickness" value={settings.ringThickness} min="0" max="0.28" step="0.01" display={`${Math.round(settings.ringThickness * 100)}%`} onChange={(v) => updateSetting("ringThickness", v)} />
+              </div>
+            </details>
           </div>
         </aside>
       </main>
 
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { margin: 0; }
+        body { margin: 0; background: #000; }
 
-        /* ── RANGE INPUT ── */
         input[type="range"] { width: 100%; accent-color: #ffffff; cursor: pointer; }
-        button, select { font-family: inherit; cursor: pointer; }
+        button { font-family: inherit; cursor: pointer; border: none; background: none; }
 
-        /* ── SPINNER ── */
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ════════════════════════════════════════
-           PAGE & SHELL
-        ════════════════════════════════════════ */
         .ls-page {
           min-height: 100vh;
-          width: 100%;
-          background: radial-gradient(circle at top left, #334155 0%, #0f172a 38%, #020617 100%);
+          background: #0a0a0f;
           color: #ffffff;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          overflow-x: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
         }
+
         .ls-hidden-video { display: none; }
 
         .ls-shell {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 430px;
-          align-items: start;
-          gap: 20px;
-          padding: 20px;
+          display: flex;
+          flex-direction: column;
           min-height: 100vh;
         }
 
-        /* ════════════════════════════════════════
-           CAMERA / PREVIEW PANEL
-        ════════════════════════════════════════ */
+        /* CAMERA PREVIEW - takes ~65% of screen height on mobile */
         .ls-preview {
           position: relative;
-          border-radius: 34px;
-          overflow: hidden;
           background: #000;
-          border: 1px solid rgba(255,255,255,.12);
-          box-shadow: 0 30px 90px rgba(0,0,0,.45);
+          height: 65vh;
+          min-height: 420px;
+          max-height: 70vh;
+          overflow: hidden;
         }
 
-        /* 16:9 wrapper — canvas fills this, NO stretch */
         .ls-canvas-wrap {
           position: relative;
           width: 100%;
-          aspect-ratio: 16 / 9;
-          overflow: hidden;
+          height: 100%;
           background: #000;
         }
 
         .ls-canvas {
           position: absolute;
-          inset: 0;
+          top: 0;
+          left: 0;
           width: 100%;
           height: 100%;
-          display: block;
+          object-fit: cover;
         }
 
-        /* ── TOPBAR ── */
+        /* Top bar */
         .ls-topbar {
           position: absolute;
-          top: 0; left: 0; right: 0;
-          padding: 20px 24px;
+          top: 0;
+          left: 0;
+          right: 0;
+          padding: 16px 18px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: linear-gradient(to bottom, rgba(0,0,0,.68), rgba(0,0,0,.18), transparent);
+          background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
           z-index: 10;
+          pointer-events: none;
         }
-        .ls-brand    { font-size: 26px; font-weight: 900; line-height: 1; letter-spacing: -0.05em; }
-        .ls-subbrand { margin-top: 6px; font-size: 12px; color: rgba(255,255,255,.68); font-weight: 600; }
-
+        .ls-brand { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+        .ls-subbrand { font-size: 10px; opacity: 0.7; margin-top: 2px; }
         .ls-status {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 13px;
-          border-radius: 999px;
-          background: rgba(0,0,0,.48);
-          border: 1px solid rgba(255,255,255,.14);
-          backdrop-filter: blur(14px);
-          font-size: 12px;
-          font-weight: 800;
-          white-space: nowrap;
+          background: rgba(0,0,0,0.5);
+ backdrop-filter: blur(12px);
+          padding: 6px 14px;
+          border-radius: 40px;
+          font-size: 11px;
+          font-weight: 700;
+          pointer-events: auto;
         }
         .ls-dot {
-          width: 8px; height: 8px;
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
-          box-shadow: 0 0 14px currentColor;
           display: inline-block;
+          margin-right: 6px;
         }
 
-        /* ── MOBILE LENS BAR (bottom of camera) ── */
+        /* Bottom lens carousel */
         .ls-mobile-lensbar {
           position: absolute;
-          left: 12px; right: 12px; bottom: 12px;
+          bottom: 80px;
+          left: 16px;
+          right: 16px;
           display: flex;
-          gap: 8px;
+          gap: 12px;
           overflow-x: auto;
-          padding: 10px 12px;
-          border-radius: 20px;
-          background: rgba(0,0,0,.48);
-          border: 1px solid rgba(255,255,255,.14);
-          backdrop-filter: blur(18px);
+          padding: 8px 4px;
           z-index: 10;
           scrollbar-width: none;
         }
@@ -2901,285 +2881,183 @@ export default function TryOn() {
 
         .ls-mobile-lens-btn {
           flex: 0 0 auto;
-          width: 44px; height: 44px;
-          border-radius: 50%;
-          border: 2px solid rgba(255,255,255,.22);
-          background: rgba(255,255,255,.08);
-          display: grid;
-          place-items: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          background: rgba(0,0,0,0.55);
+          backdrop-filter: blur(16px);
+          border: 1.5px solid rgba(255,255,255,0.3);
+          border-radius: 48px;
+          padding: 8px 14px;
+          transition: all 0.1s ease;
+        }
+        .ls-mobile-lens-btn.active-lens {
+          border-color: white;
+          background: rgba(255,255,255,0.2);
+          transform: scale(1.02);
         }
         .ls-color-dot {
-          width: 24px; height: 24px;
+          width: 28px;
+          height: 28px;
           border-radius: 50%;
-          border: 2px solid rgba(255,255,255,.55);
+          border: 2px solid white;
           display: block;
         }
+        .ls-lens-label {
+          font-size: 10px;
+          font-weight: 600;
+          color: white;
+        }
 
-        /* ── LOADING OVERLAY ── */
+        /* Capture button - center bottom like Instagram */
+        .ls-capture-btn {
+          position: absolute;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 68px;
+          height: 68px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.2);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 20;
+          border: 2px solid white;
+          transition: transform 0.05s ease;
+        }
+        .ls-capture-btn:active { transform: translateX(-50%) scale(0.92); }
+        .capture-inner {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: white;
+        }
+
+        /* Loader overlay */
         .ls-overlay {
           position: absolute;
           inset: 0;
-          display: grid;
-          place-items: center;
-          background: rgba(2,6,23,.84);
-          backdrop-filter: blur(8px);
-          z-index: 20;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 30;
         }
         .ls-loader-card {
-          width: min(340px, calc(100vw - 48px));
-          padding: 24px;
-          border-radius: 24px;
           text-align: center;
-          background: rgba(255,255,255,.08);
-          border: 1px solid rgba(255,255,255,.16);
+          padding: 24px;
+          background: rgba(30,30,40,0.8);
+          border-radius: 32px;
+          width: 260px;
         }
         .ls-spinner {
-          width: 46px; height: 46px;
-          margin: 0 auto 16px;
+          width: 44px;
+          height: 44px;
+          border: 3px solid rgba(255,255,255,0.2);
+          border-top-color: white;
           border-radius: 50%;
-          border: 4px solid rgba(255,255,255,.18);
-          border-top-color: #ffffff;
-          animation: spin .8s linear infinite;
+          margin: 0 auto 16px;
+          animation: spin 0.8s linear infinite;
         }
-        .ls-loader-title { font-size: 20px; font-weight: 900; }
-        .ls-loader-text  { margin-top: 8px; color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.5; }
 
-        /* ════════════════════════════════════════
-           SIDEBAR / CONTROL PANEL
-        ════════════════════════════════════════ */
+        /* Bottom control sheet */
         .ls-sidebar {
-          position: sticky;
-          top: 20px;
-          max-height: calc(100vh - 40px);
-          overflow-y: auto;
-          border-radius: 34px;
-          padding: 24px;
-          background: rgba(255,255,255,.08);
-          border: 1px solid rgba(255,255,255,.14);
-          backdrop-filter: blur(22px);
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,.2) transparent;
+          background: rgba(18, 20, 28, 0.96);
+          backdrop-filter: blur(20px);
+          border-radius: 28px 28px 0 0;
+          padding: 20px 18px 30px;
+          flex: 1;
         }
-        .ls-sidebar::-webkit-scrollbar { width: 4px; }
-        .ls-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 99px; }
+        .ls-sidebar-header { margin-bottom: 16px; }
+        .ls-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: #aaa; text-transform: uppercase; }
+        .ls-title { font-size: 24px; font-weight: 800; margin-top: 6px; letter-spacing: -0.5px; }
 
-        /* ── HEADER TEXT ── */
-        .ls-eyebrow    { color: rgba(255,255,255,.55); font-size: 11px; font-weight: 900; letter-spacing: 2.6px; }
-        .ls-title      { margin-top: 7px; font-size: 30px; line-height: 1.05; letter-spacing: -0.06em; }
-        .ls-description{ margin-top: 10px; color: rgba(255,255,255,.68); font-size: 13px; line-height: 1.6; }
-
-        /* ── SELECTED CARD ── */
         .ls-selected-card {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 14px;
-          border-radius: 22px;
-          background: rgba(255,255,255,.09);
-          border: 1px solid rgba(255,255,255,.14);
+          gap: 14px;
+          background: rgba(255,255,255,0.08);
+          border-radius: 28px;
+          padding: 12px 16px;
+          margin-bottom: 12px;
         }
-        .ls-selected-swatch {
-          width: 48px; height: 48px;
-          border-radius: 50%;
-          border: 3px solid rgba(255,255,255,.5);
-          box-shadow: 0 10px 26px rgba(0,0,0,.28);
-          flex-shrink: 0;
-        }
-        .ls-selected-name  { font-size: 16px; font-weight: 900; }
-        .ls-selected-price { margin-top: 3px; color: rgba(255,255,255,.62); font-size: 12px; font-weight: 700; }
+        .ls-selected-swatch { width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; }
+        .ls-selected-name { font-size: 16px; font-weight: 800; }
+        .ls-selected-price { font-size: 12px; opacity: 0.7; margin-top: 2px; }
 
-        /* ── LENS GRID ── */
-        .ls-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 10px;
+        .ls-quick-row {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 20px;
         }
-        .ls-lens-card {
-          min-height: 100px;
-          padding: 12px;
-          border-radius: 20px;
-          border: 1px solid rgba(255,255,255,.12);
-          color: #fff;
+        .ls-quick-lens {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.1);
+          border: 2px solid rgba(255,255,255,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .ls-quick-lens.active { border-color: white; background: rgba(255,255,255,0.2); transform: scale(1.05); }
+        .ls-quick-lens span { width: 28px; height: 28px; border-radius: 50%; display: block; }
+
+        .ls-controls {
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
-          gap: 7px;
-          text-align: left;
+          gap: 16px;
         }
-        .ls-lens-swatch {
-          width: 30px; height: 30px;
-          border-radius: 50%;
-          border: 2px solid rgba(255,255,255,.48);
-          display: block;
+        .ls-section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12px;
+          font-weight: 700;
+          color: #aaa;
+          letter-spacing: 1px;
         }
-        .ls-lens-name  { font-size: 12px; line-height: 1.2; }
-        .ls-lens-price { color: rgba(255,255,255,.58); font-size: 11px; font-weight: 700; }
-
-        /* ── SLIDERS SECTION ── */
-        .ls-controls {
-          display: grid;
-          gap: 14px;
-          padding: 16px;
-          border-radius: 22px;
-          background: rgba(0,0,0,.18);
-          border: 1px solid rgba(255,255,255,.1);
-        }
-        .ls-section-title {
-          padding-top: 4px;
-          color: rgba(255,255,255,.9);
+        .ls-reset-mini {
+          background: rgba(255,255,255,0.12);
+          padding: 6px 14px;
+          border-radius: 40px;
           font-size: 11px;
-          font-weight: 900;
-          letter-spacing: 1.4px;
-          text-transform: uppercase;
+          color: white;
         }
-        .ls-slider-wrap  { display: grid; gap: 6px; }
-        .ls-slider-top   { display: flex; justify-content: space-between; gap: 10px; color: rgba(255,255,255,.72); font-size: 12px; font-weight: 800; }
-        .ls-select-wrap  { display: grid; gap: 6px; }
+        .slider-item { display: flex; flex-direction: column; gap: 6px; }
+        .ls-slider-top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; opacity: 0.9; }
+        .ls-select-wrap { display: flex; flex-direction: column; gap: 6px; }
         .ls-select {
-          width: 100%;
-          border: 1px solid rgba(255,255,255,.18);
-          border-radius: 12px;
-          padding: 10px 12px;
-          background: rgba(255,255,255,.1);
-          color: #fff;
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 14px;
+          padding: 12px;
+          color: white;
+          font-weight: 600;
           outline: none;
-          font-weight: 800;
-          font-size: 13px;
         }
+        .ls-details { margin-top: 8px; }
+        .ls-details summary { font-size: 12px; font-weight: 600; opacity: 0.8; padding: 8px 0; cursor: pointer; }
+        .ls-details-content { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; padding-left: 6px; }
 
-        /* ── ACTIONS ── */
-        .ls-actions {
-          display: grid;
-          grid-template-columns: 1fr 1.5fr;
-          gap: 10px;
-        }
-        .ls-btn-secondary {
-          border: 1px solid rgba(255,255,255,.18);
-          background: rgba(255,255,255,.08);
-          color: #fff;
-          border-radius: 999px;
-          padding: 14px 16px;
-          font-weight: 900;
-          font-size: 14px;
-        }
-        .ls-btn-primary {
-          border: none;
-          background: #fff;
-          color: #020617;
-          border-radius: 999px;
-          padding: 14px 16px;
-          font-weight: 950;
-          font-size: 14px;
-          box-shadow: 0 12px 28px rgba(255,255,255,.18);
-        }
-
-        /* ════════════════════════════════════════
-           TABLET  (≤ 980px)
-        ════════════════════════════════════════ */
-        @media (max-width: 980px) {
-          .ls-shell {
-            grid-template-columns: 1fr;
-            align-items: stretch;
-            padding: 12px;
-            gap: 12px;
-            min-height: unset;
-          }
-
-          /* Sidebar: full-width card, no fixed height */
-          .ls-sidebar {
-            position: static;
-            max-height: none;
-            border-radius: 28px;
-            padding: 20px;
-            gap: 16px;
-          }
-
-          .ls-preview { border-radius: 28px; }
-          .ls-canvas-wrap { border-radius: 0; }
-        }
-
-        /* ════════════════════════════════════════
-           MOBILE  (≤ 600px)
-        ════════════════════════════════════════ */
-        @media (max-width: 600px) {
-          .ls-shell { padding: 8px; gap: 8px; }
-
-          .ls-preview,
-          .ls-sidebar { border-radius: 20px; }
-
-          /* Topbar smaller */
-          .ls-topbar  { padding: 12px 14px; }
-          .ls-brand   { font-size: 18px; }
-          .ls-subbrand{ font-size: 10px; margin-top: 3px; }
-          .ls-status  { font-size: 10px; padding: 6px 10px; gap: 6px; }
-          .ls-dot     { width: 6px; height: 6px; }
-
-          /* Mobile lens bar */
-          .ls-mobile-lensbar { bottom: 8px; left: 8px; right: 8px; padding: 8px; gap: 6px; border-radius: 14px; }
-          .ls-mobile-lens-btn { width: 36px; height: 36px; }
-          .ls-color-dot       { width: 18px; height: 18px; }
-
-          /* Sidebar */
-          .ls-sidebar { padding: 14px; gap: 12px; }
-
-          .ls-eyebrow     { font-size: 9px; letter-spacing: 2px; }
-          .ls-title       { font-size: 22px; margin-top: 5px; }
-          .ls-description { font-size: 11px; margin-top: 7px; }
-
-          /* Selected card */
-          .ls-selected-card   { padding: 10px; gap: 10px; border-radius: 16px; }
-          .ls-selected-swatch { width: 38px; height: 38px; }
-          .ls-selected-name   { font-size: 13px; }
-          .ls-selected-price  { font-size: 11px; }
-
-          /* Lens grid */
-          .ls-grid       { gap: 7px; }
-          .ls-lens-card  { min-height: 82px; padding: 10px; border-radius: 16px; gap: 5px; }
-          .ls-lens-swatch{ width: 24px; height: 24px; }
-          .ls-lens-name  { font-size: 11px; }
-          .ls-lens-price { font-size: 10px; }
-
-          /* Controls */
-          .ls-controls       { padding: 12px; gap: 11px; border-radius: 16px; }
-          .ls-section-title  { font-size: 10px; letter-spacing: 1.2px; }
-          .ls-slider-top     { font-size: 11px; }
-          .ls-select         { padding: 8px 10px; font-size: 11px; border-radius: 10px; }
-
-          /* Buttons */
-          .ls-actions        { gap: 8px; }
-          .ls-btn-secondary,
-          .ls-btn-primary    { padding: 12px 14px; font-size: 13px; }
-
-          /* Loader */
-          .ls-loader-card  { padding: 18px; border-radius: 18px; }
-          .ls-spinner      { width: 36px; height: 36px; margin-bottom: 12px; }
-          .ls-loader-title { font-size: 16px; }
-          .ls-loader-text  { font-size: 11px; }
-        }
-
-        /* ════════════════════════════════════════
-           VERY SMALL  (≤ 380px)
-        ════════════════════════════════════════ */
-        @media (max-width: 380px) {
-          .ls-title  { font-size: 19px; }
-          .ls-brand  { font-size: 16px; }
-          .ls-grid   { grid-template-columns: repeat(2, 1fr); }
+        /* Desktop/tablet fallback */
+        @media (min-width: 768px) {
+          .ls-preview { height: 70vh; max-height: 600px; }
+          .ls-sidebar { border-radius: 28px; margin: 12px; max-height: none; }
+          .ls-shell { padding: 12px; }
         }
       `}</style>
     </div>
   );
 }
 
-function SectionTitle({ title }) {
-  return <div className="ls-section-title">{title}</div>;
-}
-
 function Slider({ label, value, min, max, step, display, onChange }) {
   return (
-    <label className="ls-slider-wrap">
+    <label className="slider-item">
       <div className="ls-slider-top">
         <span>{label}</span>
         <strong>{display}</strong>
